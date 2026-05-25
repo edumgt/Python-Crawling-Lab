@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
 ## 기본 python 크롤링
 ## 이 repo 에서 크롤러, vector-db 의 연동을 실습합니다.
 
@@ -15,14 +17,14 @@ docker compose run --rm finance-crawler
 ![alt text](image.png)
 
 
-## 🎯 Purpose
+## <i class="fa-solid fa-bullseye"></i> Purpose
 **OpenSanctions**는 전 세계의 제재(Sanctions) 및 KYC/AML 관련 데이터를 수집·정제·표준화하여,  
 서로 다른 국가나 기관의 데이터라도 **일관된 FollowTheMoney 엔터티(Entity)** 구조로 표현되도록 만드는 프로젝트입니다.  
 이렇게 구조화된 데이터는 **데이터 분석**, **공유**, **컴플라이언스 검증(KYC/AML)** 등에 활용됩니다.
 
 ### https://github.com/opensanctions 를 참고합니다.
 
-## 📁 Repository Structure
+## <i class="fa-solid fa-folder"></i> Repository Structure
 
 ### `zavod/`
 - **핵심 ETL 프레임워크**
@@ -81,7 +83,7 @@ docker compose run --rm finance-crawler
 
 ---
 
-## 🐳 로컬 Docker 실행 (PostgreSQL 포함)
+## <i class="fa-brands fa-docker"></i> 로컬 Docker 실행 (PostgreSQL 포함)
 
 로컬 Docker 환경에서는 `docker-compose.yml`이 PostgreSQL과 UI를 함께 띄우도록 구성되어 있습니다.  
 `.env`의 `POSTGRES_*` 값을 필요에 따라 변경한 뒤 아래 명령으로 실행하세요.
@@ -97,7 +99,7 @@ PostgreSQL 접속: localhost:5432
 
 ---
 
-## 🐧 WSL Ubuntu 실행 가이드
+## <i class="fa-brands fa-linux"></i> WSL Ubuntu 실행 가이드
 
 WSL2 기반 Ubuntu에서 실행하려면 **Docker 엔진이 WSL에 연결**되어 있어야 합니다.
 다음 흐름으로 준비하면 안정적으로 동작합니다.
@@ -179,7 +181,7 @@ npm run dev
 ## 사전에 WSL(WSL2) 설치/관리 + 여러 리눅스 배포판 설치 + Docker Desktop(WSL2) 공유 정리
 
 > 기준: Windows 10/11에서 **WSL2**를 사용하는 일반적인 케이스  
-> PowerShell(관리자 권한)에서 실행해야 하는 명령은 ✅로 표시했습니다.
+> PowerShell(관리자 권한)에서 실행해야 하는 명령은 <i class="fa-solid fa-circle-check"></i>로 표시했습니다.
 
 ---
 
@@ -193,7 +195,7 @@ npm run dev
 
 ## 1) WSL/WSL2 설치 (가장 쉬운 방법)
 ### 1-1) WSL 설치/기본 세팅 (권장)
-✅ **PowerShell(관리자)**:
+<i class="fa-solid fa-circle-check"></i> **PowerShell(관리자)**:
 ```powershell
 wsl --install
 ```
@@ -207,7 +209,7 @@ wsl --status
 ```
 
 ### 1-3) WSL 업데이트 (커널 업데이트)
-✅ PowerShell(관리자):
+<i class="fa-solid fa-circle-check"></i> PowerShell(관리자):
 ```powershell
 wsl --update
 ```
@@ -305,7 +307,7 @@ wsl --set-version Ubuntu 1
 ```powershell
 wsl --unregister Ubuntu
 ```
-> ⚠️ 해당 배포판의 파일시스템/데이터가 모두 삭제됩니다.
+> <i class="fa-solid fa-triangle-exclamation"></i>️ 해당 배포판의 파일시스템/데이터가 모두 삭제됩니다.
 
 ### 6-2) 배포판 백업(export)
 ```powershell
