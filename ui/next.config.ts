@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const nextConfig: import("next").NextConfig = {
+  env: {
+    CRAWLER_API_URL: process.env.CRAWLER_API_URL || "http://crawler-api:8080",
+  },
   sassOptions: {
     quietDeps: true,
     silenceDeprecations: ["import", "legacy-js-api"],

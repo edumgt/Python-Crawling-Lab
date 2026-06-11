@@ -64,24 +64,31 @@ services:
     - 8899:3000
     networks:
     - shared-net
-  finance-crawler:
+  # ── 크롤러 잡 이미지 빌드 (실행은 crawler-api가 docker run --rm 으로 수행)
+  finance-crawler-job:
     build:
       context: .
-      dockerfile: Dockerfile.finance
-    environment:
-      PYTHONUNBUFFERED: '1'
-    volumes:
-    - ./load_to_qdrant.py:/app/load_to_qdrant.py
-    - ./finance.naver.com:/app/finance.naver.com
-    - ./finance.daum.net:/app/finance.daum.net
-    - ./krx.co.kr:/app/krx.co.kr
+      dockerfile: Dockerfile.crawler-job
+    image: finance-crawler-job:latest
+    profiles:
+    - build-only          # docker-compose up 시 자동 실행 안 됨
     networks:
     - shared-net
-    extra_hosts:
-    - host.docker.internal:host-gateway
-    restart: 'no'
-    command: |
-      python load_to_qdrant.py
-        --sources naver daum krx
-        --markets KOSPI KOSDAQ
-        --qdrant-url http://qdrant:6333
+
+  # ── 크롤러 백엔드 API (FE → POST /crawl/start → docker run --rm 잡 실행)
+  crawler-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler-api
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      CRAWLER_IMAGE: finance-crawler-job:latest
+      DOCKER_NETWORK: shared-net
+      PYTHONUNBUFFERED: '1'
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock   # 호스트 Docker 소켓 마운트
+    ports:
+    - 8081:8080
+    networks:
+    - shared-net
+    restart: unless-stopped

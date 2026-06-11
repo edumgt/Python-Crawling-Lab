@@ -25,7 +25,6 @@ export default function Navigation() {
               alignItems: "center",
             }}
           >
-            {/* 로고 */}
             <img
               src="https://www.sanctionlab.com/wp-content/uploads/2024/10/s-logo.png"
               width="40"
@@ -33,7 +32,6 @@ export default function Navigation() {
               className="align-top"
               alt="SanctionLab"
             />
-            {/* 로고 오른쪽 텍스트 */}
             <span
               style={{
                 fontWeight: 700,
@@ -46,6 +44,17 @@ export default function Navigation() {
             </span>
           </NavbarBrand>
         </Link>
+
+        {/* 네비게이션 링크 */}
+        <div className="d-flex align-items-center gap-3 ms-4">
+          <Link
+            href="/crawler"
+            className="text-decoration-none text-sm font-medium"
+            style={{ color: "#4b5563", fontSize: "0.9rem" }}
+          >
+            금융 크롤러
+          </Link>
+        </div>
       </div>
     </Navbar>
   );

@@ -1,0 +1,23 @@
+# Finance Crawler Backend API
+# FE 요청을 받아 Docker Job Container를 실행하고 SSE로 진행 상황을 스트리밍합니다.
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+COPY crawler_api.py .
+
+ENV PYTHONUNBUFFERED=1
+ENV QDRANT_URL=http://qdrant:6333
+ENV CRAWLER_IMAGE=finance-crawler-job:latest
+ENV DOCKER_NETWORK=shared-net
+
+EXPOSE 8080
+
+CMD ["uvicorn", "crawler_api:app", "--host", "0.0.0.0", "--port", "8080"]
