@@ -1,71 +1,69 @@
 "use client";
 import React, { useEffect, useState } from "react";
 
-interface WPPost {
-  id: number;
-  title: { rendered: string };
-  excerpt: { rendered: string };
-  link: string;
-  date: string;
-  yoast_head?: string;
+interface StockNews {
+  id: string | number;
+  name: string;
+  code: string;
+  market: string;
+  current_price: number;
+  change_rate: number;
+  volume: number;
+  crawled_at: string;
 }
 
 export default function NewsPanel() {
-  const [posts, setPosts] = useState<WPPost[]>([]);
+  const [stocks, setStocks] = useState<StockNews[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchNews() {
-      try {
-        const res = await fetch("https://www.sanctionlab.com/?rest_route=/wp/v2/posts");
-        const data = await res.json();
-        setPosts(data);
-      } catch (err) {
-        console.error("❌ Failed to fetch news:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchNews();
+    fetch("/api/news")
+      .then((r) => r.json())
+      .then((data) => setStocks(Array.isArray(data) ? data : []))
+      .catch(() => setStocks([]))
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-gray-500 text-sm">Loading latest news...</p>;
+  if (loading) return <p className="text-gray-500 text-sm">Loading stock data...</p>;
+  if (stocks.length === 0) return <p className="text-gray-400 text-sm">No stock data available.</p>;
 
   return (
     <div className="overflow-y-auto max-h-[80vh]">
-      {posts.length === 0 ? (
-        <p className="text-gray-400 text-sm">No news available.</p>
-      ) : (
-        <ul className="space-y-5">
-          {posts.map((post) => (
-            <li key={post.id} className="border-b pb-3">
-              {/* 제목 */}
-              <a
-                href={post.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-700 font-bold hover:underline"
-                dangerouslySetInnerHTML={{ __html: post.title.rendered }}
-              />
-              {/* 날짜 */}
+      <ul className="space-y-3">
+        {stocks.map((s) => {
+          const isUp = s.change_rate > 0;
+          const isDown = s.change_rate < 0;
+          const rateColor = isUp ? "text-red-600" : isDown ? "text-blue-600" : "text-gray-500";
+          const rateSign = isUp ? "▲" : isDown ? "▼" : "-";
+
+          return (
+            <li key={s.id} className="border-b pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-gray-900 text-sm">{s.name}</span>
+                <span className={`text-sm font-semibold ${rateColor} whitespace-nowrap`}>
+                  {rateSign} {Math.abs(s.change_rate).toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                <span className="bg-gray-100 px-1.5 py-0.5 rounded">{s.market}</span>
+                <span>{s.code}</span>
+                <span className="ml-auto font-medium text-gray-700">
+                  {s.current_price.toLocaleString()}원
+                </span>
+              </div>
               <div className="text-xs text-gray-400 mt-1">
-                {new Date(post.date).toLocaleDateString("ko-KR", {
-                  year: "numeric",
+                거래량 {s.volume.toLocaleString()} ·{" "}
+                {new Date(s.crawled_at).toLocaleString("ko-KR", {
                   month: "short",
                   day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
                 })}
               </div>
-              {/* 요약 */}
-              <div
-                className="text-gray-700 text-sm mt-2"
-                dangerouslySetInnerHTML={{
-                  __html: post.excerpt.rendered.replace(/\[&hellip;\]/g, "..."),
-                }}
-              />
             </li>
-          ))}
-        </ul>
-      )}
+          );
+        })}
+      </ul>
     </div>
   );
 }

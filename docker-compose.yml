@@ -60,6 +60,11 @@ services:
     environment:
       ZAVOD_DATABASE_URI: ${ZAVOD_DATABASE_URI:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-dev}}
       ZAVOD_ALLOW_UNAUTHENTICATED: ${ZAVOD_ALLOW_UNAUTHENTICATED:-true}
+      DB_HOST: postgres
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      DB_NAME: ${POSTGRES_DB:-dev}
+      QDRANT_URL: http://qdrant:6333
     ports:
     - 8899:3000
     networks:
@@ -88,7 +93,7 @@ services:
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock   # 호스트 Docker 소켓 마운트
     ports:
-    - 8081:8080
+    - 8400:8080
     networks:
     - shared-net
     restart: unless-stopped
