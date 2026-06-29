@@ -1,7 +1,19 @@
+# ── 크롤링 코어
 numpy
-qdrant-client
 requests
 beautifulsoup4
 lxml
 selenium
 webdriver-manager
+
+# ── 벡터 DB
+qdrant-client
+
+# ── 데이터 레이크 — 저장
+minio                  # MinIO S3 클라이언트
+pyarrow                # Parquet 읽기/쓰기
+pandas                 # 데이터 변환 (Silver layer)
+duckdb                 # Gold layer 집계 분석
+
+# ── 글로벌 시장
+yfinance               # Yahoo Finance (글로벌 주식/지수/ETF)

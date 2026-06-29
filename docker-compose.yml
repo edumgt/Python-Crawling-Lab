@@ -2,7 +2,47 @@ version: '3.9'
 networks:
   shared-net:
     external: true
+volumes:
+  minio-data:
+
 services:
+  # ── MinIO S3 호환 오브젝트 스토리지 (데이터 레이크 Bronze/Silver 레이어)
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    networks:
+      - shared-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── MinIO 버킷 초기화 (최초 1회)
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${MINIO_ACCESS_KEY:-minioadmin} $${MINIO_SECRET_KEY:-minioadmin};
+        mc mb --ignore-existing local/data-lake-bronze;
+        mc mb --ignore-existing local/data-lake-silver;
+        mc mb --ignore-existing local/data-lake-gold;
+        echo 'MinIO 버킷 초기화 완료';
+      "
+    networks:
+      - shared-net
   zavod:
     image: ghcr.io/opensanctions/opensanctions:latest
     user: ${LOCAL_UID:-1000}:${LOCAL_GID:-1000}
@@ -69,11 +109,30 @@ services:
     - 8899:3000
     networks:
     - shared-net
+  # ── 데이터 레이크 Gold 집계 잡 (duckdb 기반 분석 집계)
+  gold-builder:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.crawler-job
+    image: finance-crawler-job:latest
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      BUCKET_BRONZE: data-lake-bronze
+      BUCKET_SILVER: data-lake-silver
+      GOLD_DB_PATH: /data/lake/gold/analytics.duckdb
+    profiles:
+      - gold
+    networks:
+      - shared-net
+    command: ["python", "pipeline/gold_build.py"]
+
   # ── 크롤러 잡 이미지 빌드 (실행은 crawler-api가 docker run --rm 으로 수행)
   finance-crawler-job:
     build:
       context: .
-      dockerfile: Dockerfile.crawler-job
+      dockerfile: infra/Dockerfile.crawler-job
     image: finance-crawler-job:latest
     profiles:
     - build-only          # docker-compose up 시 자동 실행 안 됨
@@ -84,11 +143,16 @@ services:
   crawler-api:
     build:
       context: .
-      dockerfile: Dockerfile.crawler-api
+      dockerfile: infra/Dockerfile.crawler-api
     environment:
       QDRANT_URL: http://qdrant:6333
       CRAWLER_IMAGE: finance-crawler-job:latest
       DOCKER_NETWORK: shared-net
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      DART_API_KEY: ${DART_API_KEY:-}
+      ECOS_API_KEY: ${ECOS_API_KEY:-}
       PYTHONUNBUFFERED: '1'
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock   # 호스트 Docker 소켓 마운트

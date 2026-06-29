@@ -19,13 +19,17 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY crawler_job.py .
-COPY finance.naver.com/ ./finance.naver.com/
-COPY finance.daum.net/ ./finance.daum.net/
-COPY krx.co.kr/ ./krx.co.kr/
+# 파이프라인 스크립트
+COPY pipeline/ ./pipeline/
+
+# 크롤러 소스
+COPY crawlers/ ./crawlers/
+
+# 데이터 레이크 모듈
+COPY data_lake/ ./data_lake/
 
 ENV PYTHONUNBUFFERED=1
 ENV QDRANT_URL=http://qdrant:6333
 
-ENTRYPOINT ["python", "crawler_job.py"]
+ENTRYPOINT ["python", "pipeline/crawler_job.py"]
 CMD ["--sources", "naver", "daum", "krx", "--markets", "KOSPI", "KOSDAQ"]

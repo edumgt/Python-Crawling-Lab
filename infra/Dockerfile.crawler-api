@@ -11,7 +11,11 @@ WORKDIR /app
 COPY requirements-api.txt .
 RUN pip install --no-cache-dir -r requirements-api.txt
 
-COPY crawler_api.py .
+# 파이프라인 스크립트
+COPY pipeline/ ./pipeline/
+
+# 데이터 레이크 모듈
+COPY data_lake/ ./data_lake/
 
 ENV PYTHONUNBUFFERED=1
 ENV QDRANT_URL=http://qdrant:6333
@@ -20,4 +24,4 @@ ENV DOCKER_NETWORK=shared-net
 
 EXPOSE 8080
 
-CMD ["uvicorn", "crawler_api:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "pipeline.crawler_api:app", "--host", "0.0.0.0", "--port", "8080"]
