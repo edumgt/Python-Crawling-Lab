@@ -5,11 +5,12 @@ Silver 데이터를 읽어 투자 분석에 바로 쓸 수 있는 집계 테이�
 DuckDB 파일: /data/lake/gold/analytics.duckdb (로컬) 또는 MinIO Parquet
 
 주요 집계 테이블:
-    market_summary       시장별 종목 요약 (KOSPI/KOSDAQ/ETF/CRYPTO)
-    top_movers           등락률 상·하위 종목
-    sector_heatmap       섹터별 평균 수익률
-    macro_snapshot       최신 거시경제 지표 스냅샷
-    global_market_pulse  글로벌 시장 현황 대시보드
+    market_summary        시장별 종목 요약 (KOSPI/KOSDAQ/ETF/CRYPTO)
+    top_movers            등락률 상·하위 종목
+    sector_heatmap        섹터별 평균 수익률
+    macro_snapshot        최신 거시경제 지표 스냅샷
+    global_market_pulse   글로벌 시장 현황 대시보드
+    stock_recommendations 저평가·우량·모멘텀 기반 추천 종목
 """
 
 import logging
@@ -119,6 +120,63 @@ class GoldLayer:
         except Exception as exc:
             logger.warning("top_movers 빌드 실패: %s", exc)
 
+    def build_stock_recommendations(self, top_n: int = 15) -> None:
+        """저평가(PER/PBR) + 우량(ROE) + 배당 + 모멘텀 기반 추천 종목 스코어링"""
+        conn = self._get_conn()
+        path = self._silver_glob("stocks")
+        try:
+            conn.execute(f"""
+                CREATE OR REPLACE TABLE stock_recommendations AS
+                WITH base AS (
+                    SELECT *
+                    FROM read_parquet('{path}', union_by_name=true)
+                    WHERE per IS NOT NULL AND per > 0
+                      AND pbr IS NOT NULL AND pbr > 0
+                      AND roe IS NOT NULL
+                      AND market IS NOT NULL AND market != ''
+                ),
+                ranked AS (
+                    SELECT *,
+                        PERCENT_RANK() OVER (PARTITION BY market ORDER BY per ASC) AS per_rank,
+                        PERCENT_RANK() OVER (PARTITION BY market ORDER BY pbr ASC) AS pbr_rank,
+                        PERCENT_RANK() OVER (PARTITION BY market ORDER BY roe DESC) AS roe_rank,
+                        PERCENT_RANK() OVER (PARTITION BY market ORDER BY COALESCE(dividend_yield, 0) DESC) AS div_rank,
+                        PERCENT_RANK() OVER (PARTITION BY market ORDER BY COALESCE(change_rate, 0) DESC) AS momentum_rank
+                    FROM base
+                ),
+                scored AS (
+                    SELECT *,
+                        ROUND(
+                            (1 - per_rank) * 25
+                          + (1 - pbr_rank) * 20
+                          + (1 - roe_rank) * 25
+                          + (1 - div_rank) * 15
+                          + (1 - momentum_rank) * 15
+                        , 1) AS recommendation_score,
+                        TRIM(
+                            CASE WHEN per_rank <= 0.2 THEN '저PER ' ELSE '' END ||
+                            CASE WHEN pbr_rank <= 0.2 THEN '저PBR ' ELSE '' END ||
+                            CASE WHEN roe_rank <= 0.2 THEN '고ROE ' ELSE '' END ||
+                            CASE WHEN div_rank <= 0.2 THEN '고배당 ' ELSE '' END ||
+                            CASE WHEN momentum_rank <= 0.2 THEN '상승모멘텀' ELSE '' END
+                        ) AS reason
+                    FROM ranked
+                ),
+                final AS (
+                    SELECT *,
+                        ROW_NUMBER() OVER (PARTITION BY market ORDER BY recommendation_score DESC) AS rnk
+                    FROM scored
+                )
+                SELECT market, code, name, current_price, change_rate, per, pbr, roe,
+                       dividend_yield, market_cap, volume, recommendation_score, reason, crawled_at
+                FROM final
+                WHERE rnk <= {top_n}
+                ORDER BY market, recommendation_score DESC
+            """)
+            logger.info("Gold 집계: stock_recommendations 완료")
+        except Exception as exc:
+            logger.warning("stock_recommendations 빌드 실패: %s", exc)
+
     def build_macro_snapshot(self) -> None:
         """최신 거시경제 지표 스냅샷"""
         conn = self._get_conn()
@@ -196,14 +254,17 @@ class GoldLayer:
         logger.info("Gold Layer 전체 빌드 시작")
         self.build_market_summary()
         self.build_top_movers()
+        self.build_stock_recommendations()
         self.build_macro_snapshot()
         self.build_global_market_pulse()
         self.build_crypto_summary()
         logger.info("Gold Layer 전체 빌드 완료: %s", self._db_path)
 
-    def query(self, sql: str) -> "pd.DataFrame":
-        """Gold DB 직접 쿼리"""
+    def query(self, sql: str, params: Optional[list] = None) -> "pd.DataFrame":
+        """Gold DB 직접 쿼리 (params 전달 시 파라미터 바인딩 쿼리)"""
         conn = self._get_conn()
+        if params:
+            return conn.execute(sql, params).df()
         return conn.execute(sql).df()
 
     def list_tables(self) -> list:

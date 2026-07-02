@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from "react";
+import RecommendationsPanel from "@/components/RecommendationsPanel";
 
 // ---------------------------------------------------------------------------
 // 타입
@@ -37,6 +38,8 @@ const EVENT_LABELS: Record<string, string> = {
   upload: "Qdrant 업로드",
   done: "소스 완료",
   complete: "전체 완료",
+  gold_build_start: "추천 분석",
+  gold_build_done: "추천 완료",
   error: "오류",
   stream_end: "스트림 종료",
 };
@@ -50,6 +53,8 @@ const EVENT_COLORS: Record<string, string> = {
   upload: "text-purple-500",
   done: "text-green-600",
   complete: "text-emerald-600",
+  gold_build_start: "text-amber-500",
+  gold_build_done: "text-teal-600",
   error: "text-red-500",
   stream_end: "text-gray-400",
 };
@@ -79,6 +84,9 @@ function formatEvent(ev: CrawlEvent): string {
       return `[${ev.source?.toUpperCase()}] ${ev.market} 완료 - ${ev.uploaded}개 적재`;
     case "complete":
       return `전체 완료: ${ev.total_uploaded?.toLocaleString()}개 적재 | ${ev.duration_seconds}초`;
+    case "gold_build_start":
+    case "gold_build_done":
+      return ev.message ?? "";
     case "error":
       return `오류 [${ev.source || ""}]: ${ev.message}`;
     case "stream_end":
@@ -103,6 +111,7 @@ export default function CrawlerPage() {
   const [events, setEvents] = useState<CrawlEvent[]>([]);
   const [summary, setSummary] = useState<{ total: number; duration: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [recommendationsRefreshKey, setRecommendationsRefreshKey] = useState(0);
 
   const esRef = useRef<EventSource | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -162,6 +171,9 @@ export default function CrawlerPage() {
         }
         if (ev.type === "error") {
           setErrorMsg(ev.message ?? "알 수 없는 오류");
+        }
+        if (ev.type === "gold_build_done") {
+          setRecommendationsRefreshKey((k) => k + 1);
         }
       };
 
@@ -337,6 +349,11 @@ export default function CrawlerPage() {
           </div>
         </div>
       )}
+
+      {/* 추천 종목 */}
+      <div className="mt-6">
+        <RecommendationsPanel refreshKey={recommendationsRefreshKey} />
+      </div>
     </div>
   );
 }

@@ -13,6 +13,7 @@ Endpoints:
     GET  /lake/stats              데이터 레이크 수집 통계
     GET  /lake/history            수집 이력 조회
     POST /lake/gold/build         Gold 집계 레이어 빌드 트리거
+    GET  /lake/recommendations    추천 종목 조회 (크롤링 완료 시 자동 갱신)
 """
 
 import asyncio
@@ -109,6 +110,24 @@ CRAWLER_IMAGE = os.getenv("CRAWLER_IMAGE", "finance-crawler-job:latest")
 USE_DOCKER = os.getenv("USE_DOCKER", "true").lower() == "true"
 
 
+async def _build_recommendations(job: CrawlJob) -> None:
+    """크롤링 완료 후 Gold 레이어를 재빌드하여 추천 종목을 갱신합니다."""
+    await job.queue.put({"type": "gold_build_start", "message": "추천 종목 분석 중..."})
+    try:
+        from data_lake.gold import GoldLayer
+
+        def _build():
+            gold = GoldLayer()
+            gold.build_all()
+            gold.close()
+
+        await asyncio.to_thread(_build)
+        await job.queue.put({"type": "gold_build_done", "message": "추천 종목 분석 완료"})
+    except Exception as exc:
+        logger.warning("추천 종목 분석 실패: %s", exc)
+        await job.queue.put({"type": "gold_build_done", "message": f"추천 종목 분석 실패: {exc}"})
+
+
 async def _run_job_container(job: CrawlJob, req: CrawlRequest) -> None:
     job.status = "running"
 
@@ -178,6 +197,8 @@ async def _run_job_container(job: CrawlJob, req: CrawlRequest) -> None:
         if proc.returncode != 0:
             job.error = f"컨테이너 종료 코드: {proc.returncode}"
             await job.queue.put({"type": "error", "message": job.error})
+        elif job.total_uploaded > 0:
+            await _build_recommendations(job)
 
     except Exception as exc:
         logger.error("잡 실행 오류: %s", exc, exc_info=True)
@@ -314,6 +335,26 @@ async def build_gold():
 
     asyncio.create_task(_build())
     return {"status": "triggered", "message": "Gold 레이어 빌드가 백그라운드에서 시작되었습니다."}
+
+
+@app.get("/lake/recommendations", tags=["data-lake"])
+def lake_recommendations(market: Optional[str] = None, limit: int = 15):
+    """추천 종목 조회 (Gold 레이어 stock_recommendations 테이블)"""
+    try:
+        from data_lake.gold import GoldLayer
+        gold = GoldLayer()
+        sql = "SELECT * FROM stock_recommendations"
+        params: List[str | int] = []
+        if market:
+            sql += " WHERE market = ?"
+            params.append(market)
+        sql += " ORDER BY recommendation_score DESC LIMIT ?"
+        params.append(limit)
+        df = gold.query(sql, params)
+        gold.close()
+        return {"data": df.to_dict(orient="records"), "count": len(df)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/lake/gold/query", tags=["data-lake"])
